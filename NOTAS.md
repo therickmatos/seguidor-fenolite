@@ -126,3 +126,60 @@ Pelo guia da Espressif, nota [1]: o GPIO2 NÃO define o modo de boot; o pull-up 
 
 - Sensores de marca digitais (pull-up de 47 k a 3V3).
 - Turbina (Q1, R1, R2 + ilhós) embaixo do motor ESQUERDO. AMS1117 + C1/C2 embaixo do motor DIREITO. Botão na faixa direita.
+
+## Editor interativo (28/10)
+- Fonte: editor_template.html. O export_editor.py gera o editor_placa.html (arquivo único, 72 KB, sem dependências) com os dados do design.py: contorno, furos, keepouts com altura, componentes e netlist.
+- Funções:
+  - arrastar, girar (R / Shift+R), virar face (F, só SMD), setas e grade;
+  - desfazer/refazer, editar o contorno (com simetria), ligações (MST por rede);
+  - checagem ao vivo: placa de sucção, borda, furos, folga de 0,6 entre pads por camada, corpos × mecânica com altura, corpos sobrepostos, tamanho de 10×15;
+  - exportar texto/JSON para colar no chat, importar, autosave no localStorage.
+- Testado no Playwright: sem erros de JS, arrastar e girar funcionam, a checagem bate com a do Python e o export funciona.
+- Publicado no repo, em editor/editor_placa.html (commit 8148a28).
+- Formas de abrir:
+  - raw.githack (mostra um aviso antes, clicar "Open the page");
+  - baixar o arquivo e abrir localmente.
+  - Pages dá 403.
+- Para IMPORTAR o que o Erick colar: pegar a linha JSON (`{"v":"v2","comps":{ref:{x,y,ang,side,flip}},"outline":[...]}`) e aplicar no build_v2.
+
+## 28/10 — layout do Erick vindo do editor (v3)
+- O Erick mudou as posições no editor e colou o JSON (salvo em layout_erick.json).
+- **Intenção dele:**
+  - Cap, ponte H e MA/MB alinhados em colunas, buscando harmonia visual.
+  - SMDs de cima (menos o SW1) levados para trás, embaixo da bateria (EVA-RT: bateria sobre suportes de 3 mm, com o ATmega embaixo).
+  - Arrumar a estética.
+  - **ROTEAR em dupla face** e devolver no GitHub.
+  - Trilha mín. 0,7 mm, de preferência mais larga.
+  - Se ficar difícil chegar aos sensores laterais, os resistores podem ir para antes das abas.
+- **Minha arrumação:**
+  - Colunas alinhadas: MB centrado sobre o U4; C5 alinhado com o SW1; C3 alinhado com o TP; U3 e U4 na mesma altura.
+  - C4/C6 colados nos pinos 3-4 dos RZ; R6 perto do U4.
+- **Bateria:**
+  - SMD de até 2,5 mm cabe embaixo dela (suportes de 3 mm).
+  - Keepout nos suportes junto aos rasgos.
+  - **AVISAR:** o AMS1117 embaixo da ponta da bateria aquece a LiPo.
+- **Roteador de 2 camadas:** grade MCP em 3 planos (cima / via em retícula de 1 mm / baixo), com custo de via.
+  - **Via:** NÃO entra na placa de sucção.
+  - **PTH conectado só embaixo:** ESP, barra, DIP, eletrolíticos.
+  - **PTH conectado nos dois lados:** ilhós e XT30.
+- Keepout de cobre na antena do ESP: lado oposto ao USB, x > 10 no nariz.
+- GND: plano nas duas faces, com costura mínima de vias e sem ilhas.
+
+## Roteamento v3: estado (28/10, ~08:30)
+- **Roteador próprio, sequencial (router2):**
+  - 40 ordens testadas: sempre sobram 3–12 redes abertas.
+  - Gargalo: as 8 trilhas da fileira de trás do ESP (IO5..IO21) saem por baixo e precisam se abrir entre a borda da placa de sucção e o nariz.
+- **PathFinder:** não convergiu (VBAT×GND em pads de 220 µF e 3V3×GND no nariz).
+- **Decisão:** usar o FREEROUTING v2.5.0 (Java 25 disponível), que faz push-and-shove e rip-up de verdade.
+  - Exportar DSN Specctra com 2 camadas, keepouts e regras (0,7 / 0,6). Importar o SES.
+  - Depois rodar o MEU DRC vetorial e a checagem de conectividade, e fazer o plano de GND.
+- **Freerouting no sandbox:** precisa de HOME gravável. Rodar com `HOME=fr/home -Duser.home=fr/home`.
+
+## Roteamento v3: resultado (x2) — 28/10
+- **Freerouting** só nos sinais (GND fora), custo de camada cima 1,3 / baixo 1,0 / via 20, larguras sinal 0,8 / potência 1,1 / 3V3 0,9. Resultado: 0 redes abertas, DRC vetorial 0, 7 vias de sinal (3V3 ×2, BI_A, BTN, GATE_D, MK_L ×2).
+- **GND (final_v3.py):** plano nas duas faces → vias de costura só onde juntam grupos (busca em largura entre pedaços do plano) → jumper de fio para o que sobrar.
+  - Trilha de GND de 0,7 mm embaixo, do R6.2 ao C6.1/U4.3 (o R6.2 ficava num bolsão entre FI_B, VBAT e BTN).
+  - Via de BI_A baixada de y 21,29 para 20,55 (ainda a 1,42 mm do chevron da placa de sucção): abre a faixa de GND de cima entre a via e o ESP, e o GND do nariz fecha com 1 via em vez de jumper.
+  - Resultado: **2 vias de GND** (braço esquerdo e lado do ESP) + **1 jumper (JP1, 4,4 mm)** sobre a trilha de 3V3, na ponta de dentro do motor direito. 0 ilhas.
+  - Pedaços de plano sem GND (o triângulo embaixo da turbina, cercado pelas trilhas do ESP e sem via possível por causa da placa de sucção) foram retirados.
+- Bug antigo do close_islands (pontas do jumper nunca unidas, jumper de 0 mm, duplicado) resolvido: o union-find agora une as pontas do jumper explicitamente.

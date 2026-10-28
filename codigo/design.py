@@ -23,6 +23,8 @@ SLOTS = [box(x - 3.5, y - 0.5, x + 3.5, y + 0.5) for x, y in BATT_SLOTS]
 
 # bottom suction plate (printed 0.6 mm) under the board: NO component (tht lead or smd) here
 SUCTION = box(-23.6, -28.0, 23.6, 21.5)
+# real printed suction plate (suction_base.stl): chevron front, used for via keep-out (+0.5 mm)
+SUCTION_REAL = Polygon([(-23.08, -27.5), (23.08, -27.5), (23.08, 17.1), (0.0, 20.9), (-23.08, 17.1)])
 
 def housing_legs():
     """Real feet of the impeller housing (voxelised STL, both 45-deg rotations, +0.5 mm margin)."""
@@ -221,3 +223,20 @@ from build_v2 import build_v2, NETMAP_V2
 build_v1, NETMAP_V1 = build, NETMAP
 build = build_v2
 NETMAP.clear(); NETMAP.update(NETMAP_V2)
+
+
+# ===================== v3 (Erick's layout from the editor) =====================
+from build_v3 import build_v3, outline_v3
+build = build_v3
+outline_poly = outline_v3
+BATTERY_HOLDER_H = 3.0   # EVA-RT battery_holder.stl: battery rests 3 mm above the board
+
+def _tk_v3():
+    ko = []
+    for name, poly, mh in _tk_v2():
+        if name == 'bateria':
+            mh = BATTERY_HOLDER_H - 0.5      # low SMD (<=2.5 mm) may sit under the battery, like EVA-RT's ATmega
+        ko.append((name, poly, mh))
+    return ko
+_tk_v2 = top_keepouts_h
+top_keepouts_h = _tk_v3
