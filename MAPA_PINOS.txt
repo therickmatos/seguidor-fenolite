@@ -1,0 +1,75 @@
+=== TABELA DE COMPONENTES (x,y,ang; origem=centro turbina, +y=frente) ===
+ref  valor        lado          x       y   ang  pacote
+SW1  BTN          top      -29.60   13.20     0  tactil 2p THT
+U3   RZ7886       top      -32.50    6.80    90  DIP-8 THT
+U4   RZ7886       top       32.50    6.80    90  DIP-8 THT
+C3   220uF        top      -24.40    3.00    90  radial THT
+C5   220uF        top       24.40    3.00    90  radial THT
+U1   ESP32-C3     top        0.00   30.00    90  modulo THT
+J2   barra        top        0.00   41.00     0  header THT
+SL   QRE1113GR    bottom   -68.00    4.50     0  QRE SMD
+SR   QRE1113GR    bottom    68.00    4.50     0  QRE SMD
+C1   10uF         bottom    -5.50   30.00    90  0805
+C2   22uF         bottom     5.50   30.00    90  0805
+C4   100nF        bottom   -29.96    0.90   180  0805
+C6   100nF        bottom    35.04    0.90   180  0805
+C7   1uF          bottom     3.00   30.00    90  0805
+R1   220R         bottom    28.40   -8.60     0  0805
+R2   10k          bottom    25.00  -10.00     0  0805
+R3   10k          bottom    -3.20   33.60    90  0805
+R4   150R         bottom   -58.00    2.00     0  0805
+R5   150R         bottom    58.00    2.00     0  0805
+R6   10k          bottom    26.40    7.60    90  0805
+R8   47k          bottom   -58.00    7.00     0  0805
+R9   47k          bottom    58.00    7.00     0  0805
+U2   AMS1117-3.3  bottom     0.00   30.00     0  SOT-223
+Q1   AO3400A      bottom    25.60   -6.60     0  SOT-23
+MA   MOT ESQ      top      -39.60   10.90   270  ilhos fio
+MB   MOT DIR      top       39.60   10.90   270  ilhos fio
+TP   TURBINA      top       28.60   -3.40   180  ilhos fio
+J1   XT30PW-M     top        0.00  -29.00   180  XT30PW-M THT
+
+=== MAPA DE PINOS DO ESP32-C3 SuperMini ===
+  IO5  -> BI_B     | BI motor DIR (strapping leve, so saida)
+  IO6  -> FI_B     | FI motor DIR  -> 10k pull-down (MTCK tem pull-up no reset)
+  IO7  -> BI_A     | BI motor ESQ (glitch 5ns inofensivo)
+  IO8  -> S0       | S0 do mux (strapping; nada forca nivel no boot)
+  IO9  -> S1       | S1 do mux (BOOT; pull-up do modulo mantem)
+  IO10 -> FI_A     | FI motor ESQ (seguro no boot)
+  IO20 -> S2       | S2 do mux (RX, pull-up no boot)
+  IO21 -> S3       | S3 do mux (TX, log no boot)
+  IO0  -> MK_L     | Sensor marca ESQ (ADC1)
+  IO1  -> MK_R     | Sensor marca DIR (ADC1)
+  IO2  -> BTN      | Botao (strapping; precisa 10k pull-up p/ 3V3 -> SPI boot)
+  IO3  -> GATE_D   | GATE turbina via 220R (+10k p/ GND)
+  IO4  -> C0       | C0 do mux (ADC1)
+  3V3  -> 3V3      | saida do AMS1117
+  GND  -> GND      | plano de terra
+  5V   -> NC_5V    | NAO conectado (sem 5V na placa)
+
+=== NETLIST (net -> pinos) ===
+  3V3     : J2.1 U1.3V3 U2.2 U2.4 C2.1 C7.1 R3.1 R4.1 R8.1 R5.1 R9.1
+  BI_A    : U1.IO7 U3.1
+  BI_B    : U1.IO5 U4.1
+  BTN     : U1.IO2 SW1.1 R3.2
+  C0      : J2.4 U1.IO4
+  FI_A    : U1.IO10 U3.2
+  FI_B    : U1.IO6 U4.2 R6.1
+  GATE    : Q1.1 R1.2 R2.1
+  GATE_D  : U1.IO3 R1.1
+  GND     : J2.2 U1.GND SW1.2 U2.1 C1.2 C2.2 C7.2 U3.3 C3.2 C4.1 U4.3 C5.2 C6.1 R6.2 Q1.2 R2.2 J1.2 SL.2 SL.3 SR.2 SR.3
+  LEDA_L  : SL.1 R4.2
+  LEDA_R  : SR.1 R5.2
+  MA1     : U3.6 U3.5 MA.1
+  MA2     : U3.8 U3.7 MA.2
+  MB1     : U4.6 U4.5 MB.1
+  MB2     : U4.8 U4.7 MB.2
+  MK_L    : U1.IO0 SL.4 R8.2
+  MK_R    : U1.IO1 SR.4 R9.2
+  S0      : J2.8 U1.IO8
+  S1      : J2.7 U1.IO9
+  S2      : J2.6 U1.IO20
+  S3      : J2.5 U1.IO21
+  TURB_N  : TP.2 Q1.3
+  VBAT    : U2.3 C1.1 U3.4 C3.1 C4.2 U4.4 C5.1 C6.2 TP.1 J1.1
+  (nao-conectados: NC_5V, NC_J2 )
