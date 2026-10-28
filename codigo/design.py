@@ -176,7 +176,11 @@ def collision_report(C):
             if p.side in ('bottom', 'tht') and ref not in allow_suction and SUCTION.buffer(-0.1).contains(Point(p.x, p.y)):
                 msgs.append(f'  [SUCCAO] {ref}.{p.pin} ({p.net}) em ({p.x:.1f},{p.y:.1f})')
             if not out.contains(Point(p.x, p.y)):
-                msgs.append(f'  [FORA DA PLACA] {ref}.{p.pin} em ({p.x:.1f},{p.y:.1f})')
+                tag = 'AVISO fixacao fora da placa' if getattr(p, 'opt', False) else 'FORA DA PLACA'
+                msgs.append(f'  [{tag}] {ref}.{p.pin} em ({p.x:.1f},{p.y:.1f})')
+            for hx, hy, hd, rk in HOLES:
+                if p.geom().distance(Point(hx, hy)) < rk - 1e-6 and not getattr(p, 'opt', False):
+                    msgs.append(f'  [COBRE PERTO DE FURO] {ref}.{p.pin} a {p.geom().distance(Point(hx, hy)):.2f} mm do furo ({hx},{hy})')
         if c.body is None:
             continue
         if c.side == 'bottom':

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Editor de posicionamento — seguidor fenolite</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#f4f1ea; --panel:#ffffff; --ink:#1d2433; --muted:#6b7280; --err:#c1121f; --warn:#b45309; --ok:#2d6a4f; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:var(--ink); background:var(--bg); }
+  #app { display:flex; height:100%; }
+  #side { width:340px; min-width:300px; background:var(--panel); border-right:1px solid #ddd; overflow-y:auto; padding:10px 12px; font-size:13px; }
+  #main { flex:1; position:relative; overflow:hidden; }
+  svg { width:100%; height:100%; display:block; background:#fbfaf7; cursor:default; user-select:none; }
+  h1 { font-size:15px; margin:4px 0 8px; }
+  h2 { font-size:13px; margin:14px 0 6px; border-bottom:1px solid #eee; padding-bottom:3px; }
+  .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:4px 0; }
+  label { display:inline-flex; gap:4px; align-items:center; }
+  button { font:inherit; padding:4px 8px; border:1px solid #bbb; background:#f8f8f8; border-radius:5px; cursor:pointer; }
+  button:hover { background:#eee; }
+  button.primary { background:#1d3557; color:#fff; border-color:#1d3557; }
+  button.on { background:#ffd166; border-color:#e0a800; }
+  input[type=number] { width:72px; font:inherit; padding:2px 4px; }
+  select { font:inherit; }
+  textarea { width:100%; height:140px; font: 11px ui-monospace, Menlo, Consolas, monospace; }
+  .muted { color:var(--muted); }
+  .kbd { font: 11px ui-monospace, monospace; background:#eee; border:1px solid #ccc; border-radius:3px; padding:0 4px; }
+  #checks div { padding:2px 0; cursor:pointer; }
+  #checks .e { color:var(--err); } #checks .w { color:var(--warn); } #checks .ok { color:var(--ok); }
+  #info table { border-collapse:collapse; width:100%; font-size:12px; }
+  #info td { padding:1px 4px; border-bottom:1px solid #f0f0f0; }
+  #status { position:absolute; left:8px; bottom:6px; font-size:12px; background:#ffffffdd; padding:3px 8px; border-radius:4px; border:1px solid #ddd; }
+  #legend { position:absolute; right:8px; top:8px; font-size:11px; background:#ffffffe6; padding:6px 8px; border-radius:6px; border:1px solid #ddd; line-height:1.5; }
+  .sw { display:inline-block; width:12px; height:10px; border:1px solid #555; vertical-align:middle; margin-right:4px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="side">
+    <h1>Editor de posicionamento — seguidor fenolite</h1>
+    <div class="muted">Arraste os componentes. Vista de <b>cima</b>, frente para cima, mm, origem no centro da turbina.</div>
+
+    <h2>Placa</h2>
+    <div id="boardinfo" class="muted"></div>
+
+    <h2>Ferramentas</h2>
+    <div class="row">
+      <label>Grade <select id="snap"><option>0.1</option><option>0.25</option><option selected>0.5</option><option>1.27</option><option>2.54</option></select> mm</label>
+    </div>
+    <div class="row">
+      <button id="bRot">Girar +90 (R)</button><button id="bRotN">-90 (Shift+R)</button><button id="bFlip">Virar face (F)</button>
+    </div>
+    <div class="row">
+      <button id="bUndo">Desfazer (Ctrl+Z)</button><button id="bRedo">Refazer (Ctrl+Y)</button><button id="bFit">Enquadrar</button>
+    </div>
+    <div class="row">
+      <button id="bOutline">Editar contorno</button><label><input type="checkbox" id="sym" checked> simétrico em x</label>
+    </div>
+    <div class="muted" id="outlinehelp" style="display:none">Contorno: arraste os pontos; <b>duplo clique</b> numa borda cria ponto; selecione um ponto e aperte <span class="kbd">Delete</span> para apagar.</div>
+
+    <h2>Camadas</h2>
+    <div class="row">
+      <label><input type="checkbox" id="lTop" checked> cima</label>
+      <label><input type="checkbox" id="lBot" checked> baixo</label>
+      <label><input type="checkbox" id="lMech" checked> mecânica</label>
+      <label><input type="checkbox" id="lRat" checked> ligações</label>
+      <label><input type="checkbox" id="lGnd"> GND nas ligações</label>
+      <label><input type="checkbox" id="lLbl" checked> nomes</label>
+      <label><input type="checkbox" id="lEva" checked> contorno EVA-RT</label>
+    </div>
+
+    <h2>Selecionado</h2>
+    <div id="info" class="muted">Clique num componente.</div>
+
+    <h2>Checagem (ao vivo)</h2>
+    <div id="checks"></div>
+
+    <h2>Exportar / importar</h2>
+    <div class="row">
+      <button class="primary" id="bExport">Gerar texto para o chat</button>
+      <button id="bCopy">Copiar</button>
+      <button id="bDown">Baixar .json</button>
+    </div>
+    <textarea id="out" placeholder="Clique em 'Gerar texto para o chat', copie e cole na conversa."></textarea>
+    <div class="row">
+      <button id="bImport">Importar do texto acima</button>
+      <button id="bReset">Voltar ao original</button>
+    </div>
+    <div class="muted" style="margin-top:8px">Atalhos: <span class="kbd">R</span> girar, <span class="kbd">Shift+R</span> girar ao contrário, <span class="kbd">F</span> virar face (só SMD), setas movem 1 passo da grade, <span class="kbd">Ctrl+Z</span> desfaz. Roda do mouse = zoom; arrastar o fundo = mover a vista. O trabalho fica salvo neste navegador.</div>
+  </div>
+  <div id="main">
+    <svg id="svg"></svg>
+    <div id="legend">
+      <div><span class="sw" style="background:#a8dadc"></span>PTH em cima</div>
+      <div><span class="sw" style="background:#b7e4c7"></span>SMD em cima</div>
+      <div><span class="sw" style="background:#ffccd5;border-style:dashed"></span>SMD embaixo (cobre)</div>
+      <div><span class="sw" style="background:#8ecae655"></span>motor / caixa / bateria</div>
+      <div><span class="sw" style="background:#6c757d66"></span>pés da carcaça / presilhas</div>
+      <div><span class="sw" style="background:none;border:2px dotted #2a9d8f"></span>placa de sucção (embaixo)</div>
+      <div><span class="sw" style="background:none;border:2px dashed #d62828"></span>contorno EVA-RT</div>
+    </div>
+    <div id="status"></div>
+  </div>
+</div>
+<script>
+const DATA = /*__DATA__*/null;
+const LS_KEY = 'seguidor_editor_' + DATA.version;
+const svg = document.getElementById('svg');
+const NS = 'http://www.w3.org/2000/svg';
+let state = null;           // {comps:{ref:{x,y,ang,side,flip}}, outline:[[x,y]...]}
+let view = { x: 0, y: 5, k: 6 };
+let sel = null, selVert = null, outlineMode = false;
+let undo = [], redo = [];
+let drag = null;
+const $ = id => document.getElementById(id);
+
+// ---------------- geometry ----------------
+function rot(x, y, a) { const r = a * Math.PI / 180, c = Math.cos(r), s = Math.sin(r); return [x * c - y * s, x * s + y * c]; }
+function pip(pt, poly) { let [x, y] = pt, ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi + 1e-12) + xi)) ins = !ins; } return ins; }
+function segPt(p, a, b) { const dx = b[0] - a[0], dy = b[1] - a[1]; const L = dx * dx + dy * dy; let t = L ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L : 0; t = Math.max(0, Math.min(1, t)); const qx = a[0] + t * dx - p[0], qy = a[1] + t * dy - p[1]; return Math.hypot(qx, qy); }
+function segInter(a, b, c, d) { const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])); return o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b); }
+function polyDist(P, Q) {
+  if (pip(P[0], Q) || pip(Q[0], P)) return 0;
+  let m = Infinity;
+  for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length];
+    for (let j = 0; j < Q.length; j++) { const c = Q[j], d = Q[(j + 1) % Q.length];
+      if (segInter(a, b, c, d)) return 0;
+      m = Math.min(m, segPt(a, c, d), segPt(b, c, d), segPt(c, a, b), segPt(d, a, b)); } }
+  return m;
+}
+function polyPtDist(P, p) { if (pip(p, P)) return 0; let m = Infinity; for (let i = 0; i < P.length; i++) m = Math.min(m, segPt(p, P[i], P[(i + 1) % P.length])); return m; }
+function bbox(P) { let a = [Infinity, Infinity, -Infinity, -Infinity]; for (const [x, y] of P) { a[0] = Math.min(a[0], x); a[1] = Math.min(a[1], y); a[2] = Math.max(a[2], x); a[3] = Math.max(a[3], y); } return a; }
+function polyArea(P) { let s = 0; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; s += a[0] * b[1] - b[0] * a[1]; } return Math.abs(s) / 2; }
+function circlePoly(cx, cy, r, n = 16) { const P = []; for (let i = 0; i < n; i++) { const t = 2 * Math.PI * i / n; P.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]); } return P; }
+
+// ---------------- model ----------------
+const BASE = {}; DATA.comps.forEach(c => BASE[c.ref] = c);
+function freshState() { const s = { comps: {}, outline: DATA.outline.map(p => p.slice()) }; DATA.comps.forEach(c => s.comps[c.ref] = { x: c.x, y: c.y, ang: c.ang, side: c.side, flip: false }); return s; }
+function snapshot() { return JSON.stringify(state); }
+function pushUndo() { undo.push(snapshot()); if (undo.length > 200) undo.shift(); redo = []; }
+function save() { try { localStorage.setItem(LS_KEY, snapshot()); } catch (e) {} }
+
+function placed(ref) {   // world geometry of a component
+  const b = BASE[ref], s = state.comps[ref], f = s.flip ? -1 : 1;
+  const tf = ([lx, ly]) => { const [rx, ry] = rot(f * lx, ly, s.ang); return [s.x + rx, s.y + ry]; };
+  const pads = b.pads.map(p => {
+    const [x, y] = tf([p.lx, p.ly]);
+    let poly;
+    if (p.shape === 'circle') poly = circlePoly(x, y, p.w / 2);
+    else { poly = [[-p.w / 2, -p.h / 2], [p.w / 2, -p.h / 2], [p.w / 2, p.h / 2], [-p.w / 2, p.h / 2]].map(([u, v]) => { const [rx, ry] = rot(u, v, s.ang); return [x + rx, y + ry]; }); }
+    let side = p.side; if (s.flip && side !== 'tht') side = side === 'top' ? 'bottom' : 'top';
+    return { ...p, x, y, poly, side, r: Math.hypot(p.w, p.h) / 2 };
+  });
+  const body = b.body ? b.body.map(tf) : null;
+  const extra = (b.extra || []).map(P => P.map(tf));
+  const usb = b.usb ? b.usb.map(tf) : null;
+  return { ref, b, s, pads, body, extra, usb, side: s.side };
+}
+
+// sample points inside a body (cached, local coords)
+const SAMPLES = {};
+function bodySamples(ref) {
+  if (SAMPLES[ref]) return SAMPLES[ref];
+  const b = BASE[ref]; if (!b.body) return (SAMPLES[ref] = []);
+  const bb = bbox(b.body), st = 0.4, pts = [];
+  for (let x = bb[0] + st / 2; x < bb[2]; x += st) for (let y = bb[1] + st / 2; y < bb[3]; y += st) if (pip([x, y], b.body)) pts.push([x, y]);
+  return (SAMPLES[ref] = pts);
+}
+function worldSamples(G) { const s = G.s, f = s.flip ? -1 : 1; return bodySamples(G.ref).map(([lx, ly]) => { const [rx, ry] = rot(f * lx, ly, s.ang); return [s.x + rx, s.y + ry]; }); }
+
+// ---------------- checks ----------------
+const KT = DATA.keepouts_top.map(k => ({ ...k, bb: bbox(k.poly) }));
+const KB = DATA.keepouts_bot.map(k => ({ ...k, bb: bbox(k.poly) }));
+function inBB(p, bb) { return p[0] >= bb[0] && p[0] <= bb[2] && p[1] >= bb[1] && p[1] <= bb[3]; }
+function runChecks(G) {
+  const msgs = [], bad = new Set();
+  const E = (ref, t) => { msgs.push({ k: 'e', ref, t }); bad.add(ref); };
+  const W = (ref, t) => { msgs.push({ k: 'w', ref, t }); };
+  const out = state.outline, outBB = bbox(out);
+  const bw = outBB[2] - outBB[0], bh = outBB[3] - outBB[1];
+  const mx = DATA.rules.board_max;
+  const fits = (bw <= mx[0] && bh <= mx[1]) || (bw <= mx[1] && bh <= mx[0]);
+  if (!fits) msgs.push({ k: 'e', ref: null, t: `Contorno ${bw.toFixed(1)} x ${bh.toFixed(1)} mm não cabe na fenolite ${mx[0]} x ${mx[1]}` });
+  const allPads = [];
+  for (const g of G) {
+    for (const p of g.pads) {
+      allPads.push({ g, p });
+      const lbl = `${g.ref}.${p.pin}`;
+      if (!pip([p.x, p.y], out)) { p.opt ? W(g.ref, `${lbl}: pino de fixação fora da placa`) : E(g.ref, `${lbl}: pad fora da placa`); continue; }
+      let de = Infinity; for (let i = 0; i < out.length; i++) for (const v of p.poly) de = Math.min(de, segPt(v, out[i], out[(i + 1) % out.length]));
+      if (de < DATA.rules.edge) W(g.ref, `${lbl}: pad a ${de.toFixed(2)} mm da borda (mín ${DATA.rules.edge})`);
+      if ((p.side === 'bottom' || p.side === 'tht') && g.ref !== 'J1' && pip([p.x, p.y], DATA.suction)) E(g.ref, `${lbl}: solda/pad embaixo, dentro da placa de sucção`);
+      if (!p.opt) for (const h of DATA.holes) { const d = polyPtDist(p.poly, [h.x, h.y]); if (d < h.rk) E(g.ref, `${lbl}: cobre a ${d.toFixed(2)} mm do furo (${h.x},${h.y}); mín ${h.rk}`); }
+    }
+  }
+  // pad-pad clearance, different nets, layer-aware
+  const sameLayer = (a, b) => a === 'tht' || b === 'tht' || a === b;
+  for (let i = 0; i < allPads.length; i++) for (let j = i + 1; j < allPads.length; j++) {
+    const A = allPads[i], B = allPads[j];
+    if (A.g.ref === B.g.ref) continue;
+    if (A.p.net && A.p.net === B.p.net && !A.p.net.startsWith('NC_')) continue;
+    if (!sameLayer(A.p.side, B.p.side)) continue;
+    if (Math.hypot(A.p.x - B.p.x, A.p.y - B.p.y) - A.p.r - B.p.r > DATA.rules.clearance) continue;
+    const d = polyDist(A.p.poly, B.p.poly);
+    if (d < DATA.rules.clearance) { E(A.g.ref, `${A.g.ref}.${A.p.pin}(${A.p.net}) x ${B.g.ref}.${B.p.pin}(${B.p.net}): folga ${d.toFixed(2)} mm`); bad.add(B.g.ref); }
+  }
+  // bodies vs mechanics and vs each other
+  const S = {}; for (const g of G) if (g.body) S[g.ref] = worldSamples(g);
+  const A0 = 0.16; // area per sample (0.4 mm grid)
+  for (const g of G) {
+    if (!g.body) continue;
+    const pts = S[g.ref], h = g.b.height;
+    const ko = g.side === 'bottom' ? KB : KT;
+    const hit = {};
+    for (const k of ko) {
+      if (g.side !== 'bottom' && !(h > k.min_h)) continue;
+      if (g.ref === 'J1' && k.name === 'bateria') continue;
+      let n = 0; for (const q of pts) if (inBB(q, k.bb) && pip(q, k.poly)) n++;
+      if (n * A0 > 0.3) hit[k.name] = (hit[k.name] || 0) + n * A0;
+    }
+    for (const [name, a] of Object.entries(hit)) E(g.ref, `${g.ref} (${g.b.value}, ${h} mm, ${g.side === 'bottom' ? 'embaixo' : 'em cima'}) bate em: ${name} (${a.toFixed(1)} mm²)`);
+  }
+  const bodied = G.filter(g => g.body && g.b.kind !== 'wire');
+  for (let i = 0; i < bodied.length; i++) for (let j = i + 1; j < bodied.length; j++) {
+    const a = bodied[i], b = bodied[j];
+    const la = a.side === 'bottom' ? 'b' : 't', lb = b.side === 'bottom' ? 'b' : 't';
+    if (la !== lb) continue;
+    const bbB = bbox(b.body); let n = 0;
+    for (const q of S[a.ref]) if (inBB(q, bbB) && pip(q, b.body)) n++;
+    if (n * A0 > 0.3) { E(a.ref, `${a.ref} e ${b.ref} sobrepostos (${la === 't' ? 'em cima' : 'embaixo'})`); bad.add(b.ref); }
+  }
+  return { msgs, bad, bw, bh, fits };
+}
+
+// ---------------- rendering ----------------
+function W2S(x, y) { const r = svg.getBoundingClientRect(); return [(x - view.x) * view.k + r.width / 2, -(y - view.y) * view.k + r.height / 2]; }
+function S2W(sx, sy) { const r = svg.getBoundingClientRect(); return [(sx - r.width / 2) / view.k + view.x, -(sy - r.height / 2) / view.k + view.y]; }
+function pstr(P) { return P.map(([x, y]) => { const [a, b] = W2S(x, y); return a.toFixed(1) + ',' + b.toFixed(1); }).join(' '); }
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
+function netColor(n) { let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) % 360; return `hsl(${h},70%,40%)`; }
+function mst(pts) { const n = pts.length; if (n < 2) return []; const inT = new Array(n).fill(false), d = new Array(n).fill(Infinity), par = new Array(n).fill(-1); d[0] = 0; const E = [];
+  for (let it = 0; it < n; it++) { let u = -1; for (let i = 0; i < n; i++) if (!inT[i] && (u < 0 || d[i] < d[u])) u = i; inT[u] = true; if (par[u] >= 0) E.push([par[u], u]);
+    for (let v = 0; v < n; v++) if (!inT[v]) { const w = Math.hypot(pts[u][0] - pts[v][0], pts[u][1] - pts[v][1]); if (w < d[v]) { d[v] = w; par[v] = u; } } } return E; }
+
+let raf = 0;
+function render() { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; draw(); }); }
+function draw() {
+  svg.innerHTML = '';
+  const G = Object.keys(state.comps).map(placed);
+  const chk = runChecks(G);
+  // board
+  el('polygon', { points: pstr(state.outline), fill: '#f1e3c4', stroke: '#5a4630', 'stroke-width': 2 });
+  // mechanics
+  if ($('lMech').checked) {
+    for (const k of DATA.keepouts_top) {
+      const col = ({ 'pes da carcaca': '#6c757d', 'janela helice': '#adb5bd', 'anel carcaca': '#dee2e6', 'caixa reducao': '#8ecae6', 'motor': '#8ecae6', 'bateria': '#ffd6a5', 'presilha vareta': '#6c757d' })[k.name] || '#ccc';
+      el('polygon', { points: pstr(k.poly), fill: col, 'fill-opacity': 0.4, stroke: 'none' }).appendChild(Object.assign(document.createElementNS(NS, 'title'), { textContent: `${k.name} (bate em peças com mais de ${k.min_h} mm)` }));
+    }
+    el('polygon', { points: pstr(DATA.suction), fill: 'none', stroke: '#2a9d8f', 'stroke-width': 1.6, 'stroke-dasharray': '3 3' });
+    for (const k of DATA.keepouts_bot) if (k.name !== 'placa succao') el('polygon', { points: pstr(k.poly), fill: '#e76f51', 'fill-opacity': 0.15, stroke: '#e76f51', 'stroke-width': 0.6, 'stroke-dasharray': '2 2' });
+  }
+  if ($('lEva').checked && DATA.eva_outline.length) el('polygon', { points: pstr(DATA.eva_outline), fill: 'none', stroke: '#d62828', 'stroke-width': 1.4, 'stroke-dasharray': '6 4' });
+  for (const h of DATA.holes) { const [x, y] = W2S(h.x, h.y); el('circle', { cx: x, cy: y, r: h.d / 2 * view.k, fill: '#fff', stroke: '#222', 'stroke-width': 0.8 }); el('circle', { cx: x, cy: y, r: h.rk * view.k, fill: 'none', stroke: '#999', 'stroke-width': 0.5, 'stroke-dasharray': '2 2' }); }
+  for (const s of DATA.slots) el('polygon', { points: pstr(s), fill: '#fff', stroke: '#222', 'stroke-width': 0.8 });
+  // components: bottom first, then top
+  const order = G.slice().sort((a, b) => (a.side === 'bottom' ? 0 : 1) - (b.side === 'bottom' ? 0 : 1) || (a.ref === sel) - (b.ref === sel));
+  for (const g of order) {
+    const isBot = g.side === 'bottom';
+    if (isBot && !$('lBot').checked) continue; if (!isBot && !$('lTop').checked) continue;
+    const smd = ['sot223', 'sot23', 'res', 'cap', 'btn', 'qre'].includes(g.b.kind);
+    const [stroke, fill] = isBot ? ['#c1121f', '#ffccd5'] : (smd ? ['#2d6a4f', '#b7e4c7'] : ['#1d3557', '#a8dadc']);
+    const grp = el('g', { 'data-ref': g.ref, style: 'cursor:move' });
+    const bad = chk.bad.has(g.ref);
+    const hitP = g.body || bboxPoly(g.pads.flatMap(p => p.poly), 1.0);
+    if (g.body) el('polygon', { points: pstr(g.body), fill, 'fill-opacity': 0.85, stroke: bad ? '#ff0000' : stroke, 'stroke-width': (g.ref === sel ? 2.6 : 1.2) + (bad ? 0.8 : 0), 'stroke-dasharray': isBot ? '5 3' : '' }, grp);
+    for (const P of g.extra) el('polygon', { points: pstr(P), fill: '#bbb', 'fill-opacity': 0.5, stroke: '#888', 'stroke-width': 0.6 }, grp);
+    if (g.usb) el('polygon', { points: pstr(g.usb), fill: '#444', stroke: '#000', 'stroke-width': 0.6 }, grp);
+    for (const p of g.pads) {
+      const pc = p.side === 'bottom' ? '#e85d04' : (p.side === 'top' ? '#52b788' : '#e9c46a');
+      const e = el('polygon', { points: pstr(p.poly), fill: pc, stroke: '#333', 'stroke-width': 0.5 }, grp);
+      e.appendChild(Object.assign(document.createElementNS(NS, 'title'), { textContent: `${g.ref}.${p.pin} (${p.name}) → ${p.net}` }));
+      if (p.drill) { const [x, y] = W2S(p.x, p.y); el('circle', { cx: x, cy: y, r: p.drill / 2 * view.k, fill: '#fff' }, grp); }
+    }
+    if (!g.body) el('polygon', { points: pstr(hitP), fill: '#000', 'fill-opacity': 0.001, stroke: g.ref === sel ? '#1d3557' : (bad ? '#ff0000' : 'none'), 'stroke-width': 1.5, 'stroke-dasharray': '3 2' }, grp);
+    if ($('lLbl').checked) { const [x, y] = W2S(g.s.x, g.s.y); const t = el('text', { x, y: y + 4, 'text-anchor': 'middle', 'font-size': Math.max(9, Math.min(13, view.k * 1.6)), 'font-weight': 700, fill: bad ? '#c00' : stroke, 'pointer-events': 'none', 'paint-order': 'stroke', stroke: '#fff', 'stroke-width': 3 }, grp); t.textContent = g.ref; }
+    grp.addEventListener('pointerdown', ev => startDrag(ev, g.ref));
+  }
+  // ratsnest
+  if ($('lRat').checked) {
+    const padsByKey = {}; for (const g of G) for (const p of g.pads) padsByKey[`${g.ref}.${p.pin}`] = p;
+    for (const [n, list] of Object.entries(DATA.nets)) {
+      if (n === 'GND' && !$('lGnd').checked) continue;
+      const pts = list.map(k => padsByKey[k]).filter(Boolean).map(p => [p.x, p.y]); if (pts.length < 2) continue;
+      for (const [a, b] of mst(pts)) { const [x1, y1] = W2S(...pts[a]), [x2, y2] = W2S(...pts[b]); el('line', { x1, y1, x2, y2, stroke: netColor(n), 'stroke-width': 1, 'stroke-opacity': 0.8, 'pointer-events': 'none' }).appendChild(Object.assign(document.createElementNS(NS, 'title'), { textContent: n })); }
+    }
+  }
+  // outline handles
+  if (outlineMode) state.outline.forEach(([x, y], i) => { const [a, b] = W2S(x, y); const c = el('circle', { cx: a, cy: b, r: 5, fill: i === selVert ? '#ffd166' : '#fff', stroke: '#5a4630', 'stroke-width': 1.5, style: 'cursor:grab' }); c.addEventListener('pointerdown', ev => startVert(ev, i)); });
+  // side panel
+  const area = polyArea(state.outline) / 100;
+  $('boardinfo').innerHTML = `Contorno: <b>${chk.bw.toFixed(1)} × ${chk.bh.toFixed(1)} mm</b> — área ${area.toFixed(1)} cm² — ${chk.fits ? '<span style="color:#2d6a4f">cabe na fenolite 10 × 15 cm</span>' : '<b style="color:#c1121f">NÃO cabe na 10 × 15 cm</b>'}`;
+  const ne = chk.msgs.filter(m => m.k === 'e').length, nw = chk.msgs.filter(m => m.k === 'w').length;
+  $('checks').innerHTML = (chk.msgs.length ? '' : '<div class="ok">OK: sem colisões nem folgas abaixo de 0,6 mm</div>') + `<div class="muted">${ne} erro(s), ${nw} aviso(s)</div>` +
+    chk.msgs.map(m => `<div class="${m.k}" data-ref="${m.ref || ''}"><b>${m.k === 'e' ? 'ERRO' : 'AVISO'}</b> ${m.t}</div>`).join('');
+  $('checks').querySelectorAll('div[data-ref]').forEach(d => d.onclick = () => { if (d.dataset.ref) { sel = d.dataset.ref; render(); } });
+  showInfo(G);
+}
+function bboxPoly(P, m) { const b = bbox(P); return [[b[0] - m, b[1] - m], [b[2] + m, b[1] - m], [b[2] + m, b[3] + m], [b[0] - m, b[3] + m]]; }
+function showInfo(G) {
+  if (!sel || !state.comps[sel]) { $('info').innerHTML = 'Clique num componente.'; return; }
+  const g = G.find(q => q.ref === sel), s = state.comps[sel];
+  const smd = ['sot223', 'sot23', 'res', 'cap', 'btn', 'qre'].includes(g.b.kind);
+  $('info').innerHTML = `<b>${sel}</b> — ${g.b.value} <span class="muted">(${g.b.kind}, altura ${g.b.height} mm, ${s.side === 'bottom' ? 'embaixo' : 'em cima'}${smd ? '' : ', PTH'})</span>
+    <div class="row">x <input type="number" step="0.1" id="ix" value="${s.x.toFixed(2)}"> y <input type="number" step="0.1" id="iy" value="${s.y.toFixed(2)}"> ângulo <input type="number" step="15" id="ia" value="${s.ang}"></div>
+    <table>${g.pads.map(p => `<tr><td>${p.pin}</td><td>${p.name}</td><td><b>${p.net}</b></td><td class="muted">${p.side}</td></tr>`).join('')}</table>`;
+  const upd = () => { pushUndo(); s.x = +$('ix').value; s.y = +$('iy').value; s.ang = ((+$('ia').value % 360) + 360) % 360; save(); render(); };
+  ['ix', 'iy', 'ia'].forEach(id => $(id).addEventListener('change', upd));
+}
+
+// ---------------- interaction ----------------
+const snapv = () => +$('snap').value;
+const snapf = v => Math.round(v / snapv()) * snapv();
+function startDrag(ev, ref) {
+  if (outlineMode) return;
+  ev.stopPropagation(); ev.preventDefault();
+  sel = ref; const s = state.comps[ref]; const [wx, wy] = S2W(ev.offsetX, ev.offsetY);
+  pushUndo(); drag = { type: 'comp', ref, dx: s.x - wx, dy: s.y - wy, moved: false };
+  svg.setPointerCapture(ev.pointerId); render();
+}
+function startVert(ev, i) { ev.stopPropagation(); ev.preventDefault(); selVert = i; pushUndo(); drag = { type: 'vert', i }; svg.setPointerCapture(ev.pointerId); render(); }
+svg.addEventListener('pointerdown', ev => {
+  if (ev.target !== svg && !(outlineMode && ev.target.tagName === 'polygon')) {}
+  if (drag) return;
+  drag = { type: 'pan', sx: ev.clientX, sy: ev.clientY, vx: view.x, vy: view.y, moved: false };
+  svg.setPointerCapture(ev.pointerId);
+});
+svg.addEventListener('pointermove', ev => {
+  if (!drag) { const [x, y] = S2W(ev.offsetX, ev.offsetY); $('status').textContent = `x = ${x.toFixed(2)}  y = ${y.toFixed(2)} mm` + (sel ? `   |   ${sel}` : ''); return; }
+  if (drag.type === 'pan') { view.x = drag.vx - (ev.clientX - drag.sx) / view.k; view.y = drag.vy + (ev.clientY - drag.sy) / view.k; drag.moved = drag.moved || Math.abs(ev.clientX - drag.sx) + Math.abs(ev.clientY - drag.sy) > 3; render(); return; }
+  const [wx, wy] = S2W(ev.offsetX, ev.offsetY);
+  if (drag.type === 'comp') { const s = state.comps[drag.ref]; s.x = snapf(wx + drag.dx); s.y = snapf(wy + drag.dy); drag.moved = true; render(); }
+  if (drag.type === 'vert') { const o = state.outline, p = o[drag.i], nx = snapf(wx), ny = snapf(wy);
+    if ($('sym').checked) { const m = o.findIndex((q, k) => k !== drag.i && Math.abs(q[0] + p[0]) < 0.06 && Math.abs(q[1] - p[1]) < 0.06); if (m >= 0) { o[m][0] = -nx; o[m][1] = ny; } }
+    p[0] = nx; p[1] = ny; render(); }
+});
+svg.addEventListener('pointerup', ev => {
+  if (drag && drag.type === 'pan' && !drag.moved) { sel = null; selVert = null; render(); }
+  if (drag && drag.type === 'comp' && !drag.moved) undo.pop();
+  if (drag && drag.type !== 'pan') save();
+  drag = null;
+});
+svg.addEventListener('dblclick', ev => {
+  if (!outlineMode) return;
+  const p = S2W(ev.offsetX, ev.offsetY), o = state.outline; let best = -1, bd = Infinity;
+  for (let i = 0; i < o.length; i++) { const d = segPt(p, o[i], o[(i + 1) % o.length]); if (d < bd) { bd = d; best = i; } }
+  if (bd * view.k < 12) { pushUndo(); o.splice(best + 1, 0, [snapf(p[0]), snapf(p[1])]); selVert = best + 1;
+    if ($('sym').checked && Math.abs(p[0]) > 0.1) { const q = [-snapf(p[0]), snapf(p[1])]; let b2 = -1, d2 = Infinity; for (let i = 0; i < o.length; i++) { const d = segPt(q, o[i], o[(i + 1) % o.length]); if (d < d2) { d2 = d; b2 = i; } } o.splice(b2 + 1, 0, q); }
+    save(); render(); }
+});
+svg.addEventListener('wheel', ev => { ev.preventDefault(); const [wx, wy] = S2W(ev.offsetX, ev.offsetY); const f = Math.exp(-ev.deltaY * 0.0015); view.k = Math.max(1.5, Math.min(60, view.k * f)); const [nx, ny] = S2W(ev.offsetX, ev.offsetY); view.x += wx - nx; view.y += wy - ny; render(); }, { passive: false });
+
+function rotateSel(d) { if (!sel) return; pushUndo(); const s = state.comps[sel]; s.ang = ((s.ang + d) % 360 + 360) % 360; save(); render(); }
+function flipSel() { if (!sel) return; const b = BASE[sel]; if (!['sot223', 'sot23', 'res', 'cap', 'qre', 'btn'].includes(b.kind)) { alert('Só SMD pode trocar de face (PTH fica sempre em cima).'); return; } pushUndo(); const s = state.comps[sel]; s.flip = !s.flip; s.side = s.side === 'top' ? 'bottom' : 'top'; save(); render(); }
+document.addEventListener('keydown', ev => {
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); doUndo(); return; }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'y') { ev.preventDefault(); doRedo(); return; }
+  if (ev.key === 'r' || ev.key === 'R') rotateSel(ev.shiftKey ? -90 : 90);
+  if (ev.key === 'f' || ev.key === 'F') flipSel();
+  if ((ev.key === 'Delete' || ev.key === 'Backspace') && outlineMode && selVert != null && state.outline.length > 3) { pushUndo(); state.outline.splice(selVert, 1); selVert = null; save(); render(); }
+  const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[ev.key];
+  if (mv && sel) { ev.preventDefault(); pushUndo(); const s = state.comps[sel]; s.x = +(s.x + mv[0] * snapv()).toFixed(3); s.y = +(s.y + mv[1] * snapv()).toFixed(3); save(); render(); }
+});
+function doUndo() { if (!undo.length) return; redo.push(snapshot()); state = JSON.parse(undo.pop()); save(); render(); }
+function doRedo() { if (!redo.length) return; undo.push(snapshot()); state = JSON.parse(redo.pop()); save(); render(); }
+function fit() { const b = bbox(state.outline), r = svg.getBoundingClientRect(); view.x = (b[0] + b[2]) / 2; view.y = (b[1] + b[3]) / 2; view.k = Math.min(r.width / (b[2] - b[0] + 12), r.height / (b[3] - b[1] + 12)); render(); }
+
+function exportText() {
+  const b = bbox(state.outline);
+  const lines = ['# EDITOR SEGUIDOR ' + DATA.version + ' - cole isto no chat do Kiro', `# contorno ${(b[2] - b[0]).toFixed(1)} x ${(b[3] - b[1]).toFixed(1)} mm`, '# ref | face | x | y | angulo'];
+  for (const ref of Object.keys(state.comps).sort()) { const s = state.comps[ref]; lines.push(`${ref} ${s.side} ${s.x.toFixed(2)} ${s.y.toFixed(2)} ${s.ang}`); }
+  lines.push('# JSON (para o Kiro importar):');
+  lines.push(JSON.stringify({ v: DATA.version, comps: state.comps, outline: state.outline.map(([x, y]) => [+x.toFixed(2), +y.toFixed(2)]) }));
+  return lines.join('\n');
+}
+$('bExport').onclick = () => { $('out').value = exportText(); $('out').select(); };
+$('bCopy').onclick = async () => { if (!$('out').value) $('out').value = exportText(); try { await navigator.clipboard.writeText($('out').value); $('bCopy').textContent = 'Copiado!'; setTimeout(() => $('bCopy').textContent = 'Copiar', 1500); } catch (e) { $('out').select(); document.execCommand('copy'); } };
+$('bDown').onclick = () => { const blob = new Blob([JSON.stringify({ v: DATA.version, comps: state.comps, outline: state.outline }, null, 1)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'posicionamento_seguidor.json'; a.click(); };
+$('bImport').onclick = () => { const t = $('out').value; const m = t.match(/\{[\s\S]*\}\s*$/m); if (!m) { alert('Cole o texto exportado (com a linha JSON).'); return; } try { const j = JSON.parse(m[0]); pushUndo(); for (const [k, v] of Object.entries(j.comps || {})) if (state.comps[k]) Object.assign(state.comps[k], v); if (j.outline) state.outline = j.outline; save(); render(); } catch (e) { alert('JSON inválido: ' + e.message); } };
+$('bReset').onclick = () => { if (!confirm('Voltar todas as posições e o contorno ao original?')) return; pushUndo(); state = freshState(); save(); render(); };
+$('bRot').onclick = () => rotateSel(90); $('bRotN').onclick = () => rotateSel(-90); $('bFlip').onclick = flipSel;
+$('bUndo').onclick = doUndo; $('bRedo').onclick = doRedo; $('bFit').onclick = fit;
+$('bOutline').onclick = () => { outlineMode = !outlineMode; $('bOutline').classList.toggle('on', outlineMode); $('outlinehelp').style.display = outlineMode ? 'block' : 'none'; selVert = null; render(); };
+['lTop', 'lBot', 'lMech', 'lRat', 'lGnd', 'lLbl', 'lEva'].forEach(id => $(id).onchange = render);
+window.addEventListener('resize', render);
+
+// ---------------- start ----------------
+try { const sv = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); state = sv && sv.comps ? sv : freshState(); for (const c of DATA.comps) if (!state.comps[c.ref]) state.comps[c.ref] = { x: c.x, y: c.y, ang: c.ang, side: c.side, flip: false }; } catch (e) { state = freshState(); }
+setTimeout(fit, 0);
+</script>
+</body>
+</html>

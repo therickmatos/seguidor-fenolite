@@ -117,9 +117,13 @@ def fp_radial(ref, x, y, ang, dia, pitch, value):
     return Comp(ref, 'ecap', x, y, ang, value).place(pads, Point(0, 0).buffer(dia / 2, 24), height=max(6, dia))
 
 def fp_header(ref, x, y, ang, n, names, value):
+    """Right-angle (lying) 2.54 header: plastic housing 1.5..4.04 mm in front of the hole row (+y local),
+    pins sticking out to 10.04 mm (drawn only)."""
     pads = [(str(i + 1), names[i], (i - (n - 1) / 2) * P, 0, 'rect' if i == 0 else 'circle', 1.7, 1.7, 1.0, 'tht') for i in range(n)]
-    body = box(-n * P / 2, -1.27, n * P / 2, 1.27)
-    return Comp(ref, 'hdr', x, y, ang, value).place(pads, body, height=3)
+    body = box(-n * P / 2, 1.5, n * P / 2, 4.04)
+    c = Comp(ref, 'hdr', x, y, ang, value).place(pads, body, height=3)
+    c.extra = [affinity.translate(affinity.rotate(box(-n * P / 2 + 0.6, 4.04, n * P / 2 - 0.6, 10.04), ang, origin=(0, 0)), x, y)]
+    return c
 
 def fp_wirepads(ref, x, y, ang, names, value, pitch=2.54, d=2.2, drill=1.0):
     n = len(names)
@@ -137,9 +141,14 @@ def fp_xt30(ref, x, y, ang, names=('VBAT', 'GND')):
     """XT30PW-M horizontal PCB male. Pins Ø1.9 at 5mm pitch; body extends to +y (place with
     ang=180 so it overhangs the back edge). Mounting posts omitted (can be glued)."""
     pads = [('1', names[0], -2.5, 0, 'rect', 3.4, 3.4, 1.9, 'tht'),
-            ('2', names[1], 2.5, 0, 'circle', 3.4, 3.4, 1.9, 'tht')]
-    body = box(-5.0, 1.0, 5.0, 10.1)
-    return Comp(ref, 'xt30', x, y, ang, 'XT30PW-M').place(pads, body, height=6)
+            ('2', names[1], 2.5, 0, 'circle', 3.4, 3.4, 1.9, 'tht'),
+            ('M1', 'fixacao', -5.5, 10.0, 'circle', 1.2, 1.2, 1.0, 'tht'),   # plastic posts (Amass footprint)
+            ('M2', 'fixacao', 5.5, 10.0, 'circle', 1.2, 1.2, 1.0, 'tht')]
+    body = box(-4.95, 4.1, 4.95, 13.1)                                    # body in front of the pins
+    c = Comp(ref, 'xt30', x, y, ang, 'XT30PW-M').place(pads, body, height=6)
+    for p in c.pads[2:]:
+        p.opt = True        # optional mechanical support: warn (not error) if off-board
+    return c
 
 def fp_qre(ref, x, y, ang):
     """QRE1113GR on BOTTOM (copper) side. Top-view pins: 1 A(-2,-0.9) 2 K(2,-0.9) 3 E(2,0.9) 4 C(-2,0.9)."""
