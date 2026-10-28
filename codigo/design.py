@@ -25,15 +25,10 @@ SLOTS = [box(x - 3.5, y - 0.5, x + 3.5, y + 0.5) for x, y in BATT_SLOTS]
 SUCTION = box(-23.6, -28.0, 23.6, 21.5)
 
 def housing_legs():
-    """4 feet of the impeller housing on the diagonals (45,135,225,315), r 18.5..27.5."""
-    polys = []
-    for a in (45, 135, 225, 315):
-        pts = [(18.0 * math.cos(math.radians(a)), 18.0 * math.sin(math.radians(a)))]
-        for da in range(-18, 19, 3):
-            t = math.radians(a + da)
-            pts.append((27.5 * math.cos(t), 27.5 * math.sin(t)))
-        polys.append(Polygon(pts))
-    return polys
+    """Real feet of the impeller housing (voxelised STL, both 45-deg rotations, +0.5 mm margin)."""
+    import json, os
+    fn = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pes_reais.json')
+    return [Polygon(p) for p in json.load(open(fn))]
 
 def top_keepouts_h():
     """Each entry: (name, polygon, min_height) -> a TOP component taller than min_height collides.
@@ -47,7 +42,7 @@ def top_keepouts_h():
     for b in [box(30.3, -29.0, 40.2, -1.5), box(-40.2, -29.0, -30.3, -1.5)]:
         ko.append(('caixa reducao', b, 0.0))
     for b in [box(15.0, -16.5, 31.0, -6.0), box(-31.0, -16.5, -15.0, -6.0)]:
-        ko.append(('motor', b, 0.0))
+        ko.append(('motor', b, 2.8))   # motor belly ~3.4 mm above the board: low SMD fits under it
     ko.append(('bateria', box(-29.0, -32.0, 29.0, -15.0), 0.0))
     for x, y in CLAMP_SCREWS:
         ko.append(('presilha vareta', Point(x, y).buffer(2.6, 24), 0.0))
@@ -77,6 +72,8 @@ def outline_poly():
             (32.7, -32.0), (29.2, -28.5), (22.0, -28.5), (20.5, -30.0), (0.0, -30.0)]
     left = [(-x, y) for x, y in reversed(half)]
     body = Polygon(half + left[1:])
+    # rear-left corner squared and extended 2.5 mm to carry the XT30 (battery lies across the back)
+    body = unary_union([body, box(-40.0, -34.5, -27.5, -28.5)])
     # small central front nub to host the sensor header + ESP above the suction plate
     ext = box(-12.0, 18.0, 12.0, 43.0)
     return unary_union([body, ext]).simplify(0.01)
@@ -175,7 +172,8 @@ def collision_report(C):
     msgs = []
     for ref, c in sorted(C.items()):
         for p in c.pads:
-            if ref not in allow_suction and SUCTION.buffer(-0.1).contains(Point(p.x, p.y)):
+            # only bottom SMD and through-hole leads reach the bottom face (suction plate); top SMD is fine
+            if p.side in ('bottom', 'tht') and ref not in allow_suction and SUCTION.buffer(-0.1).contains(Point(p.x, p.y)):
                 msgs.append(f'  [SUCCAO] {ref}.{p.pin} ({p.net}) em ({p.x:.1f},{p.y:.1f})')
             if not out.contains(Point(p.x, p.y)):
                 msgs.append(f'  [FORA DA PLACA] {ref}.{p.pin} em ({p.x:.1f},{p.y:.1f})')
@@ -212,3 +210,10 @@ def collision_report(C):
             if tops[i].body.intersection(tops[j].body).area > 0.3:
                 msgs.append(f'  [CORPOS SOBREPOSTOS] {tops[i].ref} x {tops[j].ref}')
     return msgs
+
+
+# ===================== v2 (double-sided) overrides =====================
+from build_v2 import build_v2, NETMAP_V2
+build_v1, NETMAP_V1 = build, NETMAP
+build = build_v2
+NETMAP.clear(); NETMAP.update(NETMAP_V2)

@@ -73,3 +73,56 @@
 - Imagens agora na RAIZ do workspace: PLACA_v1_posicionamento.png e PLACA_v1_nariz_zoom.png.
 - Checagem nova (folga pad-pad entre redes + corpos sobrepostos) achou erros no v1: ilhós MA/MB em cima dos pinos dos RZ, C4/C6 sobre pads, 220µF sobre os RZ.
 - Correção: RZ deitados (ang 90, saídas viradas para frente), ilhós dos motores na lateral externa, 220µF nos vãos de ar da carcaça (como no EVA-RT), turbina/MOSFET abaixo do RZ direito. Borda frontal das faixas laterais sobe para y=15 (+2 mm, pequeno).
+
+## 28/10 — MUDANÇA DE ESCOPO (Erick)
+- **DUPLA FACE.** A placa crua é de 10 × 15 cm: o contorno precisa caber em 150 × 100 (hoje 144 × 75 cabe deitado).
+- **Nada embaixo do ESP:** tirar o AMS1117 e os resistores dali.
+- **Região embaixo dos motores pode levar SMD** (no EVA-RT os IFX ficam ali). Nesse lugar cabem SMD do lado de CIMA, porque o motor está a ~3,4 mm da placa.
+  - Ponto a conferir: altura do SOT-223 (1,8 mm) e do SOT-23 (~1,1 mm). Cabem embaixo do motor 8520, que deixa ~3,4 mm.
+- Abas laterais estão OK.
+- **Botão SMD KFC-A06.** Opções: 4×4×1,5 mm com 4 terminais, ou 3×6×4,3 mm com 2 terminais. Escolher qual fica melhor com trilha ≥ 0,7.
+- **XT30 sai do centro:** a bateria fica deitada atrás, como no EVA-RT. Pôr o XT30 à esquerda/direita, ou na parte da frente da placa.
+- Liberdade para girar componentes e trocar pinos. Evitar aglomerar.
+
+### Implicações da dupla face
+- Fenolite dupla face caseira não tem furo metalizado. Toda via vira um fio soldado dos dois lados.
+- PTH só solda bem no lado de baixo: o corpo do componente impede a solda em cima, exceto no DIP com uma folga.
+- Regra: trilha em cima só pode chegar a pad PTH se der para soldar em cima, ou por via. Dar preferência a SMD em cima, onde ficam os componentes.
+- **Plano:**
+  - GND como plano em baixo (+ cima onde der).
+  - SMD do lado de CIMA, embaixo dos motores (AMS1117, AO3400A, R, C): fica longe do chão e resolve a altura do SOT-223.
+  - Embaixo continua valendo a placa de sucção (sem componente). Trilhas OK.
+
+### Decisões v2 (dupla face)
+- **Pés reais da carcaça** (voxel, ±45°, margem de 0,5): r 19,2–27,0, ±10° nas diagonais. A posição dos IFX do EVA-RT (±22,1; −12,45) NÃO colide.
+- **Embaixo do motor 8520:** o fundo do motor fica a ~3,4 mm da placa, então peças de até ~2,8 mm cabem embaixo dele em cima. Cabem SOT-223 (1,8), SOT-23 (1,1), 0805 e 1206.
+- **Botão:** KFC-A06 2 terminais 3×6×4,3 SMD (EM CIMA).
+  - Pads grandes e afastados nas pontas: o mais fácil com trilha de 0,7 e folga de 0,6. Os 4 pads pequenos do 4×4 apertam a folga.
+  - Tem 4,3 mm de altura, fácil de apertar.
+  - Pads de 1,8×1,4 em ±3,6 mm. CONFERIR com o paquímetro (a página só tem as medidas na imagem).
+- **XT30PW-M:** canto traseiro (esquerdo), atrás da caixa de redução, com a boca para trás e o corpo para fora da borda traseira. A bateria fica deitada atrás, como no EVA-RT.
+- **SMD em cima:** AMS1117+caps embaixo do motor esquerdo; AO3400A+R embaixo do motor direito, perto da turbina.
+- **Vias caseiras:** fio soldado dos dois lados.
+  - EVITAR via dentro da placa de sucção (o calombo de solda embaixo).
+  - Preferir as vias fora de |x|<23,6.
+
+### GPIO2: confirmado
+Pelo guia da Espressif, nota [1]: o GPIO2 NÃO define o modo de boot; o pull-up é recomendado só por causa de glitches. Por isso o GPIO2 serve como S2 do mux (entrada de alta impedância; um glitch no boot não causa nada).
+
+### Mapa de pinos v2
+- **Fileira da frente → barra, ligação reta:** 3V3, GND, IO4=C0, IO3=S3, IO2=S2, IO1=S1, IO0=S0.
+- **Fileira de trás:**
+
+| Pino | Função | Observação |
+|---|---|---|
+| IO5 | FI_A | |
+| IO6 | GATE | 4,7 k p/ GND: o pull-up de reset (~45 k) dá 0,31 V, MOSFET desligado |
+| IO7 | BI_A | |
+| IO8 | MK_L | entrada; o pull-up do sensor mantém nível alto, sem efeito no boot |
+| IO9 | BTN | é o próprio BOOT |
+| IO10 | BI_B | |
+| IO20 | FI_B | +10 k p/ GND |
+| IO21 | MK_R | entrada |
+
+- Sensores de marca digitais (pull-up de 47 k a 3V3).
+- Turbina (Q1, R1, R2 + ilhós) embaixo do motor ESQUERDO. AMS1117 + C1/C2 embaixo do motor DIREITO. Botão na faixa direita.

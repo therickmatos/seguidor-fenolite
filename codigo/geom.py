@@ -80,30 +80,36 @@ def fp_dip8(ref, x, y, ang, names=None):
     body = box(-3.3, -5.0, 3.3, 5.0)
     return Comp(ref, 'dip8', x, y, ang, 'RZ7886').place(pads, body, height=4)
 
-def fp_sot223(ref, x, y, ang, names=('GND', 'OUT', 'IN', 'OUT')):
-    """AMS1117 SOT-223 on BOTTOM. 3 pins pitch 2.3 on one edge + big tab (pin2 net) on the other."""
-    pads = [('1', names[0], -2.3, -3.1, 'rect', 1.2, 2.0, 0, 'bottom'),
-            ('2', names[1], 0.0, -3.1, 'rect', 1.2, 2.0, 0, 'bottom'),
-            ('3', names[2], 2.3, -3.1, 'rect', 1.2, 2.0, 0, 'bottom'),
-            ('4', names[3], 0.0, 2.3, 'rect', 3.6, 2.2, 0, 'bottom')]
+def fp_sot223(ref, x, y, ang, names=('GND', 'OUT', 'IN', 'OUT'), side='top'):
+    """AMS1117 SOT-223. 3 pins pitch 2.3 on one edge + big tab (pin2 net) on the other. Height 1.8."""
+    pads = [('1', names[0], -2.3, -3.1, 'rect', 1.2, 2.0, 0, side),
+            ('2', names[1], 0.0, -3.1, 'rect', 1.2, 2.0, 0, side),
+            ('3', names[2], 2.3, -3.1, 'rect', 1.2, 2.0, 0, side),
+            ('4', names[3], 0.0, 2.3, 'rect', 3.6, 2.2, 0, side)]
     body = box(-3.3, -1.8, 3.3, 1.8)
-    return Comp(ref, 'sot223', x, y, ang, 'AMS1117-3.3').place(pads, body, height=1.8, side='bottom')
+    return Comp(ref, 'sot223', x, y, ang, 'AMS1117-3.3').place(pads, body, height=1.8, side=side)
 
-def fp_sot23(ref, x, y, ang, names=('G', 'S', 'D')):
-    """AO3400A SOT-23 on BOTTOM. pin1 G (bl), pin2 S (br), pin3 D (top-centre)."""
-    pads = [('1', names[0], -0.95, -1.1, 'rect', 1.0, 1.1, 0, 'bottom'),
-            ('2', names[1], 0.95, -1.1, 'rect', 1.0, 1.1, 0, 'bottom'),
-            ('3', names[2], 0.0, 1.1, 'rect', 1.0, 1.1, 0, 'bottom')]
+def fp_sot23(ref, x, y, ang, names=('G', 'S', 'D'), side='top'):
+    """AO3400A SOT-23. pin1 G (bl), pin2 S (br), pin3 D (top-centre). Height ~1.1."""
+    pads = [('1', names[0], -0.95, -1.1, 'rect', 1.0, 1.1, 0, side),
+            ('2', names[1], 0.95, -1.1, 'rect', 1.0, 1.1, 0, side),
+            ('3', names[2], 0.0, 1.1, 'rect', 1.0, 1.1, 0, side)]
     body = box(-1.45, -0.7, 1.45, 0.7)
-    return Comp(ref, 'sot23', x, y, ang, 'AO3400A').place(pads, body, height=1.1, side='bottom')
+    return Comp(ref, 'sot23', x, y, ang, 'AO3400A').place(pads, body, height=1.1, side=side)
 
-def fp_smd(ref, x, y, ang, value, kind='res', size='0805'):
-    """0805 resistor/cap on BOTTOM. Pads at +-1.0, trace can pass between them under the body."""
-    g = {'0805': (1.0, 1.2, 1.4, 2.0, 1.3), '1206': (1.6, 1.4, 1.8, 3.2, 1.7)}[size]
+def fp_smd(ref, x, y, ang, value, kind='res', size='1206', side='top'):
+    """Chip R/C. 1206 default (easy hand soldering on fenolite). A 0.7 track can pass under a 1206."""
+    g = {'0805': (1.0, 1.2, 1.4, 2.0, 1.3), '1206': (1.5, 1.2, 1.7, 3.2, 1.6)}[size]
     dx, pw, ph, bx, by = g
-    pads = [('1', '1', -dx, 0, 'rect', pw, ph, 0, 'bottom'), ('2', '2', dx, 0, 'rect', pw, ph, 0, 'bottom')]
+    pads = [('1', '1', -dx, 0, 'rect', pw, ph, 0, side), ('2', '2', dx, 0, 'rect', pw, ph, 0, side)]
     body = box(-bx / 2, -by / 2, bx / 2, by / 2)
-    return Comp(ref, kind, x, y, ang, value).place(pads, body, height=1.0, side='bottom')
+    return Comp(ref, kind, x, y, ang, value).place(pads, body, height=1.2, side=side)
+
+def fp_btn_smd(ref, x, y, ang, value='KFC-A06 3x6x4.3'):
+    """KFC-A06 2-terminal SMD tact switch 3x6x4.3 on TOP. Pads at the short ends (confirm with caliper)."""
+    pads = [('1', 'A', -3.6, 0, 'rect', 1.8, 1.4, 0, 'top'), ('2', 'B', 3.6, 0, 'rect', 1.8, 1.4, 0, 'top')]
+    body = box(-3.0, -1.75, 3.0, 1.75)
+    return Comp(ref, 'btn', x, y, ang, value).place(pads, body, height=4.3, side='top')
 
 def fp_radial(ref, x, y, ang, dia, pitch, value):
     pads = [('1', '+', -pitch / 2, 0, 'rect', 1.8, 1.8, 0.9, 'tht'),

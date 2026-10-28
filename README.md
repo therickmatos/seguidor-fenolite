@@ -1,25 +1,25 @@
-# Seguidor fenolite — posicionamento v1 (para aprovação)
+# Seguidor fenolite — posicionamento v2 (dupla face, para aprovação)
 
-Placa base do seguidor em fenolite face simples, baseada no EVA-RT. Ainda **não roteada**: falta aprovar o posicionamento e o mapa de pinos.
+Placa base do seguidor em fenolite **dupla face**, baseada no EVA-RT. Ainda **não roteada**.
 
-![Posicionamento v1](imagens/placa_v1_posicionamento.png)
+![Posicionamento v2](imagens/placa_v2_posicionamento.png)
 
-![Zoom no nariz](imagens/placa_v1_nariz_zoom.png)
+![Zoom no nariz](imagens/placa_v2_nariz_zoom.png)
 
-## Resumo
-- Placa de **144 × 75 mm** contando os braços dos sensores de marca. O corpo principal fica ≈ ao do EVA-RT (100 × 61).
-- O que cresce:
-  - **Nariz central** de 24 mm de largura e +15 mm de comprimento, para o ESP32-C3 (pinos PTH não podem ficar sobre a placa de sucção).
-  - Faixas laterais com +2 mm na frente.
-- Origem no centro da turbina, +y = frente, vista de cima.
-- Furos da turbina, da carcaça, das caixas, das presilhas e os rasgos da bateria nas posições exatas do EVA-RT (conferidas no Gerber).
-- Checagem automática sem colisões:
-  - Mecânica: pés e hélice da carcaça, motores, caixas, bateria e presilhas.
-  - Elétrica: folga ≥ 0,6 mm entre pads de redes diferentes.
+## O que mudou da v1
+- **Dupla face.** A placa tem 144 × 77,5 mm e cabe na fenolite de 10 × 15 cm.
+- **Nada embaixo do ESP.** O nariz leva só o ESP e a barra da frente.
+- **SMD em cima, embaixo dos motores** (onde o EVA-RT põe os IFX). O motor fica a ~3,4 mm da placa.
+  - Motor direito: AMS1117 + 10 µF + 22 µF.
+  - Motor esquerdo: AO3400A + 220 Ω + 4,7 k da turbina.
+- **XT30** no canto traseiro esquerdo, com a boca para trás. A bateria fica deitada atrás, como no EVA-RT.
+- **Botão** KFC-A06 2 terminais (3×6×4,3 SMD), na faixa direita.
+- **Mapa de pinos:** a fileira do ESP virada para a frente liga reto na barra (C0, S3..S0 = IO4..IO0). Os sensores de marca passam a ser digitais (IO8/IO21).
 
-Tabela de posições, mapa de pinos e netlist em [`MAPA_PINOS.txt`](MAPA_PINOS.txt).
+## Verificação
+- Checagem automática **sem colisões**:
+  - mecânica: pés reais da carcaça (STL), hélice Ø34, motores, caixas, bateria, presilhas e placa de sucção;
+  - folga ≥ 0,6 mm entre pads de redes diferentes.
+- Furos da turbina, da carcaça, das caixas, das presilhas e rasgos da bateria nas posições exatas do EVA-RT (Gerber).
 
-## Decisões pendentes
-1. Aprovar o posicionamento.
-2. Passar S0–S3 para IO0–IO3, para as trilhas irem retas até a barra (cerca de −4 jumpers). Com isso, os sensores de marca passam a ser lidos como digitais.
-3. Manter face simples.
+Tabela de posições, mapa de pinos e netlist: [`MAPA_PINOS.txt`](MAPA_PINOS.txt). Raciocínio e medições: [`NOTAS.md`](NOTAS.md).
